@@ -19,6 +19,7 @@ func init() {
 }
 
 func main() {
+	fmt.Println("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
 	rand.Seed(time.Now().UTC().UnixNano())
 	var action string
 	var mergeStrategy string
@@ -34,11 +35,13 @@ func main() {
 		"pod",
 		"test",
 	}
-	cmd := exec.Command("kubectl", args...)
+	cmd := exec.Command("/bin/sh", "/builder/kubectl.bash")
+	time.Sleep(60 * time.Second)
+	cmd = exec.Command("kubectl", args...)
 
 	_, err := cmd.Output()
 	if err != nil {
-		fmt.Println("hekko")
+		fmt.Printf("hekko, %+v", err)
 	}
 
 	// isDelete := action == "delete"
