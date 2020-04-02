@@ -1,18 +1,21 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"math/rand"
-	// "os"
-	"time"
-	"os/exec"
 
+	// "os"
+	"os/exec"
+	"time"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	// "k8s.io/apimachinery/pkg/runtime"
 )
 
 // var (
-	// setupLog = ctrl.Log.WithName("setup")
+// setupLog = ctrl.Log.WithName("setup")
 // )
 
 func init() {
@@ -31,19 +34,26 @@ func main() {
 	flag.Parse()
 
 	args := []string{
-		"delete",
+		"get",
 		"pod",
 		"test",
+		"-ojson",
 	}
 	cmd := exec.Command("/bin/sh", "/builder/kubectl.bash")
 	time.Sleep(60 * time.Second)
 	cmd = exec.Command("kubectl", args...)
-
-	_, err := cmd.Output()
+	out, err := cmd.Output()
 	if err != nil {
 		fmt.Printf("hekko, %+v", err)
 	}
 
+	obj := unstructured.Unstructured{}
+	err = json.Unmarshal(out, &obj)
+	if err != nil {
+		fmt.Printf("hekko1, %+v", err)
+	}
+	fmt.Printf("------- %+v", obj)
+	fmt.Printf("+++++++ %+v", out)
 	// isDelete := action == "delete"
 	// args := []string{
 	// 	action,
