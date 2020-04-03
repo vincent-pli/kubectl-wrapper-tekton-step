@@ -15,7 +15,7 @@
 BIN_DIR=_output/bin
 
 # If tag not explicitly set in users default to the git sha.
-TAG ?= v0.0.20
+TAG ?= v0.0.21
 
 .EXPORT_ALL_VARIABLES:
 
