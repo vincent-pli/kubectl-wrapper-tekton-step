@@ -13,6 +13,12 @@ spec:
       description: Merge strategy when using action  patch
     - name: manifest
       description: Content of the resource to deploy
+    - name: success-condition
+      default: ""
+      description: A label selector express to decide if the action on resource is success.
+    - name: failure-condition
+      default: ""
+      description: A label selector express to decide if the action on resource is failure.
     - name: image
       default: index.docker.io/vincentpli/kubeclient:v0.0.21 # it is huge
       description: Kubectl wrapper image
@@ -23,3 +29,5 @@ spec:
       - --action=$(inputs.params.action)
       - --merge-strategy=$(inputs.params.merge-strategy)
       - --manifest=$(inputs.params.manifest)
+      - --success-condition=$(inputs.params.success-condition)
+      - --failure-condition=$(inputs.params.failure-condition)
