@@ -5,11 +5,13 @@ go 1.13
 require (
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/docker/docker v1.4.2-0.20190327010347-be7ac8be2ae0 // indirect
+	github.com/google/martian v2.1.0+incompatible
 	github.com/imdario/mergo v0.3.8 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/prometheus/client_golang v1.1.0 // indirect
 	github.com/prometheus/common v0.7.0 // indirect
 	github.com/prometheus/procfs v0.0.7 // indirect
+	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v0.0.5
 	//github.ibm.com/panpxpx/klsf v0.0.0-00010101000000-000000000000
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20191023171146-3cf2f69b5738 // indirect

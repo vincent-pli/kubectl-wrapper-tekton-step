@@ -4,110 +4,90 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"math/rand"
-
-	// "os"
+	"io/ioutil"
+	"os"
 	"os/exec"
-	"time"
+	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	// "k8s.io/apimachinery/pkg/runtime"
 )
 
-// var (
-// setupLog = ctrl.Log.WithName("setup")
-// )
+const (
+	manifestPath = "/tmp/manifest.yaml"
+)
 
 func init() {
 }
 
 func main() {
-	fmt.Println("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
-	rand.Seed(time.Now().UTC().UnixNano())
 	var action string
 	var mergeStrategy string
 	var manifest string
 
-	flag.StringVar(&action, "action", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&mergeStrategy, "merge-strategy", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&manifest, "manifest", ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(&action, "action", "delete", "The action on the resource.")
+	flag.StringVar(&mergeStrategy, "merge-strategy", "strategic", "The merge strtegy when using action patch.")
+	flag.StringVar(&manifest, "manifest", "", "The content of resource.")
 	flag.Parse()
 
-	args := []string{
-		"get",
-		"pod",
-		"test",
-		"-ojson",
-	}
-	cmd := exec.Command("/bin/sh", "/builder/kubectl.bash")
-	time.Sleep(60 * time.Second)
-	cmd = exec.Command("kubectl", args...)
-	out, err := cmd.Output()
+	err := ioutil.WriteFile(manifestPath, []byte(manifest), 0644)
 	if err != nil {
-		fmt.Printf("hekko, %+v", err)
+		log.Errorf("Write manifest to file failed: %+v:", err)
+		os.Exit(1)
 	}
 
+	cmd := exec.Command("/bin/sh", "/builder/kubectl.bash")
+	if err != nil {
+		log.Errorf("Initialize script failed: %+v:", err)
+		os.Exit(1)
+	}
+
+	isDelete := action == "delete"
+	args := []string{
+		action,
+	}
+	output := "json"
+	if isDelete {
+		args = append(args, "--ignore-not-found")
+		output = "name"
+	}
+
+	if action == "patch" {
+		args = append(args, "--type")
+		args = append(args, mergeStrategy)
+		args = append(args, "-p")
+
+		buff, err := ioutil.ReadFile(manifestPath)
+		if err != nil {
+			log.Errorf("Read menifest file failed: %v", err)
+			os.Exit(1)
+		}
+
+		args = append(args, string(buff))
+	}
+
+	args = append(args, "-f")
+	args = append(args, manifestPath)
+	args = append(args, "-o")
+	args = append(args, output)
+	cmd = exec.Command("kubectl", args...)
+	log.Info(strings.Join(cmd.Args, " "))
+	out, err := cmd.Output()
+	if err != nil {
+		exErr := err.(*exec.ExitError)
+		errMsg := strings.TrimSpace(string(exErr.Stderr))
+		log.Errorf("Run kubectl command failed with: %v and %v", exErr, errMsg)
+		os.Exit(1)
+	}
+	if action == "delete" {
+		os.Exit(0)
+	}
 	obj := unstructured.Unstructured{}
 	err = json.Unmarshal(out, &obj)
 	if err != nil {
-		fmt.Printf("hekko1, %+v", err)
+		log.Errorf("Unmarshl output failed: %v", err)
+		os.Exit(1)
 	}
-	fmt.Printf("------- %+v", obj)
-	fmt.Printf("+++++++ %+v", out)
-	// isDelete := action == "delete"
-	// args := []string{
-	// 	action,
-	// }
-	// output := "json"
-	// if isDelete {
-	// 	args = append(args, "--ignore-not-found")
-	// 	output = "name"
-	// }
-
-	// if action == "patch" {
-	// 	mergeStrategy := "strategic"
-	// 	if we.Template.Resource.MergeStrategy != "" {
-	// 		mergeStrategy = we.Template.Resource.MergeStrategy
-	// 	}
-
-	// 	args = append(args, "--type")
-	// 	args = append(args, mergeStrategy)
-
-	// 	args = append(args, "-p")
-	// 	buff, err := ioutil.ReadFile(manifestPath)
-
-	// 	if err != nil {
-	// 		return "", "", errors.New(errors.CodeBadRequest, err.Error())
-	// 	}
-
-	// 	args = append(args, string(buff))
-	// }
-
-	// args = append(args, "-f")
-	// args = append(args, manifestPath)
-	// args = append(args, "-o")
-	// args = append(args, output)
-	// cmd := exec.Command("kubectl", args...)
-	// log.Info(strings.Join(cmd.Args, " "))
-	// out, err := cmd.Output()
-	// if err != nil {
-	// 	exErr := err.(*exec.ExitError)
-	// 	errMsg := strings.TrimSpace(string(exErr.Stderr))
-	// 	return "", "", errors.New(errors.CodeBadRequest, errMsg)
-	// }
-	// if action == "delete" {
-	// 	return "", "", nil
-	// }
-	// obj := unstructured.Unstructured{}
-	// err = json.Unmarshal(out, &obj)
-	// if err != nil {
-	// 	return "", "", err
-	// }
-	// resourceName := fmt.Sprintf("%s.%s/%s", obj.GroupVersionKind().Kind, obj.GroupVersionKind().Group, obj.GetName())
-	// log.Infof("%s/%s", obj.GetNamespace(), resourceName)
-	// cmd := plugins.Register()
-	// if err := cmd.Execute(); err != nil {
-	// 	_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
-	// 	os.Exit(1)
-	// }
+	resourceName := fmt.Sprintf("%s.%s/%s", obj.GroupVersionKind().Kind, obj.GroupVersionKind().Group, obj.GetName())
+	log.Infof("%s/%s", obj.GetNamespace(), resourceName)
 }
