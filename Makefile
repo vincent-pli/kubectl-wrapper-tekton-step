@@ -25,10 +25,10 @@ init:
 	mkdir -p ${BIN_DIR}
 
 local: init
-	go build -o=${BIN_DIR}/kubeclient ./cmd/scheduler
+	go build -o=${BIN_DIR}/kubeclient ./cmd/client
 
 build-linux: init
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o=${BIN_DIR}/kubeclient ./cmd/scheduler
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o=${BIN_DIR}/kubeclient ./cmd/client
 
 image: build-linux
 	docker build  . -t vincentpli/kubeclient:$(TAG)

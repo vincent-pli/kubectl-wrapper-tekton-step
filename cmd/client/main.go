@@ -66,7 +66,6 @@ func main() {
 			log.Errorf("Waiting resource failed: %+v:", err)
 			os.Exit(1)
 		}
-
 	}
 
 }
