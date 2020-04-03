@@ -13,6 +13,7 @@ require (
 	github.com/prometheus/procfs v0.0.7 // indirect
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v0.0.5
+	github.com/tidwall/gjson v1.6.0 // indirect
 	//github.ibm.com/panpxpx/klsf v0.0.0-00010101000000-000000000000
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20191023171146-3cf2f69b5738 // indirect
 	go.uber.org/multierr v1.4.0 // indirect
