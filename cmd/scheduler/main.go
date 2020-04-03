@@ -50,7 +50,7 @@ func main() {
 	_, err = cmd.Output()
 	if err != nil {
 		log.Errorf("Initialize script failed: %+v:", err)
-		os.Exit(1)
+		//os.Exit(1)
 	}
 
 	isDelete := action == "delete"
