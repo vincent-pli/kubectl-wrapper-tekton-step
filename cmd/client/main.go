@@ -20,7 +20,9 @@ import (
 )
 
 const (
-	manifestPath = "/tmp/manifest.yaml"
+	ManifestPath = "/tmp/manifest.yaml"
+	Separator    = ","
+	OutputFile   = "/tekton/output"
 )
 
 func init() {
@@ -32,15 +34,18 @@ func main() {
 	var manifest string
 	var successCondition string
 	var failureCondition string
+	var output string
 
 	flag.StringVar(&action, "action", "delete", "The action on the resource.")
 	flag.StringVar(&mergeStrategy, "merge-strategy", "strategic", "The merge strtegy when using action patch.")
 	flag.StringVar(&manifest, "manifest", "", "The content of resource.")
 	flag.StringVar(&successCondition, "success-condition", "", "A label selector express to decide if the action on resource is success.")
 	flag.StringVar(&failureCondition, "failure-condition", "", "A label selector express to decide if the action on resource is failure.")
+	flag.StringVar(&output, "output", "", "An express to retrieval data from resource.")
+
 	flag.Parse()
 
-	err := ioutil.WriteFile(manifestPath, []byte(manifest), 0644)
+	err := ioutil.WriteFile(ManifestPath, []byte(manifest), 0644)
 	if err != nil {
 		log.Errorf("Write manifest to file failed: %+v:", err)
 		os.Exit(1)
@@ -50,7 +55,6 @@ func main() {
 	_, err = cmd.Output()
 	if err != nil {
 		log.Errorf("Initialize script failed: %+v:", err)
-		//os.Exit(1)
 	}
 
 	isDelete := action == "delete"
@@ -64,6 +68,12 @@ func main() {
 		err = waitResource(resourceNamespace, resourceName, successCondition, failureCondition)
 		if err != nil {
 			log.Errorf("Waiting resource failed: %+v:", err)
+			os.Exit(1)
+		}
+
+		err = saveResult(resourceNamespace, resourceName, output)
+		if err != nil {
+			log.Errorf("Write output failed: %+v:", err)
 			os.Exit(1)
 		}
 	}
@@ -86,7 +96,7 @@ func execResource(action, mergeStrategy string) (string, string, error) {
 		args = append(args, mergeStrategy)
 		args = append(args, "-p")
 
-		buff, err := ioutil.ReadFile(manifestPath)
+		buff, err := ioutil.ReadFile(ManifestPath)
 		if err != nil {
 			log.Errorf("Read menifest file failed: %v", err)
 			return "", "", err
@@ -96,7 +106,7 @@ func execResource(action, mergeStrategy string) (string, string, error) {
 	}
 
 	args = append(args, "-f")
-	args = append(args, manifestPath)
+	args = append(args, ManifestPath)
 	args = append(args, "-o")
 	args = append(args, output)
 	cmd := exec.Command("kubectl", args...)
@@ -307,10 +317,6 @@ func readJSON(reader *bufio.Reader) ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-func saveResult() error {
-	return nil
-}
-
 // gjsonLabels is an implementation of labels.Labels interface
 // which allows us to take advantage of k8s labels library
 // for the purposes of evaluating fail and success conditions
@@ -326,4 +332,66 @@ func (g gjsonLabels) Has(label string) bool {
 // Get returns the value for the provided label.
 func (g gjsonLabels) Get(label string) string {
 	return gjson.GetBytes(g.json, label).String()
+}
+
+type output struct {
+	name string,
+	value *string,
+}
+
+// Save result to files
+func saveResult(namespace, name, output, outputPath string) error {
+	var outputs = []output{}
+
+	if len(output) == 0 {
+		log.Infof("No output parameters")
+		return nil
+	}
+
+	log.Infof("Saving resource output parameters")
+	for i, param := range strings.Split(output, Separator) {
+		param = strings.Trim(param, " ")
+		if len(param) == 0 {
+			continue
+		}
+		var cmd *exec.Cmd
+		args := []string{"get", resourceName, "-o", fmt.Sprintf("jsonpath=%s", param.ValueFrom.JSONPath)}
+		if resourceNamespace != "" {
+			args = append(args, "-n", resourceNamespace)
+		}
+		cmd = exec.Command("kubectl", args...)
+
+		log.Info(cmd.Args)
+		out, err := cmd.Output()
+		if err != nil {
+			log.Infof("Returning from successful wait for resource %s", name)
+			return err
+		}
+		ot := output{}
+		ot.name = param
+		ot.value = &string(out)
+		append(outputs, ot)
+		log.Infof("Saved output parameter: %s, value: %s", param, output)
+	}
+
+	err := writeFiles(outputs)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func writeFiles(outputs []output) error {
+	outputBytes, err := json.Marshal(outputs)
+	if err != nil {
+		return errors.InternalWrapError(err)
+	}
+
+	err := ioutil.WriteFile(OutputFile, outputBytes, 0644)
+	if err != nil {
+		log.Errorf("Write output to file failed: %+v:", err)
+		return err
+	}
+	return nil
 }
