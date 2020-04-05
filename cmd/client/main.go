@@ -334,14 +334,14 @@ func (g gjsonLabels) Get(label string) string {
 	return gjson.GetBytes(g.json, label).String()
 }
 
-type output struct {
-	name string,
-	value *string,
+type outputItem struct {
+	name string
+	value string
 }
 
 // Save result to files
-func saveResult(namespace, name, output, outputPath string) error {
-	var outputs = []output{}
+func saveResult(resourceNamespace, resourceName, output string) error {
+	outputs := []outputItem{}
 
 	if len(output) == 0 {
 		log.Infof("No output parameters")
@@ -349,13 +349,13 @@ func saveResult(namespace, name, output, outputPath string) error {
 	}
 
 	log.Infof("Saving resource output parameters")
-	for i, param := range strings.Split(output, Separator) {
+	for _, param := range strings.Split(output, Separator) {
 		param = strings.Trim(param, " ")
 		if len(param) == 0 {
 			continue
 		}
 		var cmd *exec.Cmd
-		args := []string{"get", resourceName, "-o", fmt.Sprintf("jsonpath=%s", param.ValueFrom.JSONPath)}
+		args := []string{"get", resourceName, "-o", fmt.Sprintf("jsonpath=%s", param)}
 		if resourceNamespace != "" {
 			args = append(args, "-n", resourceNamespace)
 		}
@@ -364,13 +364,13 @@ func saveResult(namespace, name, output, outputPath string) error {
 		log.Info(cmd.Args)
 		out, err := cmd.Output()
 		if err != nil {
-			log.Infof("Returning from successful wait for resource %s", name)
+			log.Infof("Retrieval output failed %s/%s with error: %+v", resourceNamespace, resourceName, err)
 			return err
 		}
-		ot := output{}
+		ot := outputItem{}
 		ot.name = param
-		ot.value = &string(out)
-		append(outputs, ot)
+		ot.value = string(out)
+		outputs = append(outputs, ot)
 		log.Infof("Saved output parameter: %s, value: %s", param, output)
 	}
 
@@ -382,13 +382,13 @@ func saveResult(namespace, name, output, outputPath string) error {
 	return nil
 }
 
-func writeFiles(outputs []output) error {
+func writeFiles(outputs []outputItem) error {
 	outputBytes, err := json.Marshal(outputs)
 	if err != nil {
-		return errors.InternalWrapError(err)
+		return err
 	}
 
-	err := ioutil.WriteFile(OutputFile, outputBytes, 0644)
+	err = ioutil.WriteFile(OutputFile, outputBytes, 0644)
 	if err != nil {
 		log.Errorf("Write output to file failed: %+v:", err)
 		return err
