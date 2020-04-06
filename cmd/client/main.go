@@ -22,7 +22,7 @@ import (
 const (
 	ManifestPath = "/tmp/manifest.yaml"
 	Separator    = ","
-	OutputFile   = "/tekton/output"
+	OutputFile   = "/tekton/results/output"
 )
 
 func init() {
@@ -335,8 +335,8 @@ func (g gjsonLabels) Get(label string) string {
 }
 
 type outputItem struct {
-	name string
-	value string
+	Name string
+	Value string
 }
 
 // Save result to files
@@ -368,10 +368,10 @@ func saveResult(resourceNamespace, resourceName, output string) error {
 			return err
 		}
 		ot := outputItem{}
-		ot.name = param
-		ot.value = string(out)
+		ot.Name = param
+		ot.Value = string(out)
 		outputs = append(outputs, ot)
-		log.Infof("Saved output parameter: %s, value: %s", param, output)
+		log.Infof("Saved output parameter: %s, value: %s", ot.Name, ot.Value)
 	}
 
 	err := writeFiles(outputs)
@@ -383,11 +383,12 @@ func saveResult(resourceNamespace, resourceName, output string) error {
 }
 
 func writeFiles(outputs []outputItem) error {
+	log.Infof("xxxxxxxx: %+v", outputs)
 	outputBytes, err := json.Marshal(outputs)
 	if err != nil {
 		return err
 	}
-
+	log.Infof("xxxxxxxx: %s", string(outputBytes))
 	err = ioutil.WriteFile(OutputFile, outputBytes, 0644)
 	if err != nil {
 		log.Errorf("Write output to file failed: %+v:", err)

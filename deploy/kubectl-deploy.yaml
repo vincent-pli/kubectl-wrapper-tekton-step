@@ -19,6 +19,9 @@ spec:
     - name: failure-condition
       default: ""
       description: A label selector express to decide if the action on resource is failure.
+    - name: output
+      default: ""
+      description: An express to retrieval data from resource.
     - name: image
       default: index.docker.io/vincentpli/kubeclient:v0.0.21 # it is huge
       description: Kubectl wrapper image
@@ -31,3 +34,9 @@ spec:
       - --manifest=$(inputs.params.manifest)
       - --success-condition=$(inputs.params.success-condition)
       - --failure-condition=$(inputs.params.failure-condition)
+      - --output=$(inputs.params.output)
+  - name: sleep
+    image: docker
+    script: sleep 600
+
+

@@ -13,6 +13,8 @@ spec:
       value: status.phase == Running
     - name: failure-condition
       value: status.phase in (Failed, Error)
+    - name: output
+      value: "{.metadata.name}"
     - name: manifest
       value: |
         apiVersion: v1
