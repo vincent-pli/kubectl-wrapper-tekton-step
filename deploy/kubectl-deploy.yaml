@@ -1,40 +1,39 @@
-apiVersion: tekton.dev/v1alpha1
+apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: kubectl-deploy-pod
   namespace: default
 spec:
-  inputs:
-    params:
-    - name: action
-      description: Action on the resource
-    - name: merge-strategy
-      default: strategic
-      description: Merge strategy when using action  patch
-    - name: manifest
-      description: Content of the resource to deploy
-    - name: success-condition
-      default: ""
-      description: A label selector express to decide if the action on resource is success.
-    - name: failure-condition
-      default: ""
-      description: A label selector express to decide if the action on resource is failure.
-    - name: output
-      default: ""
-      description: An express to retrieval data from resource.
-    - name: image
-      default: index.docker.io/vincentpli/kubeclient:v0.0.21 # it is huge
-      description: Kubectl wrapper image
+  params:
+  - name: action
+    description: Action on the resource
+  - name: merge-strategy
+    default: strategic
+    description: Merge strategy when using action  patch
+  - name: manifest
+    description: Content of the resource to deploy
+  - name: success-condition
+    default: ""
+    description: A label selector express to decide if the action on resource is success.
+  - name: failure-condition
+    default: ""
+    description: A label selector express to decide if the action on resource is failure.
+  - name: output
+    default: ""
+    description: An express to retrieval data from resource.
+  - name: image
+    default: index.docker.io/vincentpli/kubeclient:v0.0.21 # it is huge
+    description: Kubectl wrapper image
   steps:
   - name: kubeconfig
-    image: $(inputs.params.image)
+    image: $(params.image)
     args:
-      - --action=$(inputs.params.action)
-      - --merge-strategy=$(inputs.params.merge-strategy)
-      - --manifest=$(inputs.params.manifest)
-      - --success-condition=$(inputs.params.success-condition)
-      - --failure-condition=$(inputs.params.failure-condition)
-      - --output=$(inputs.params.output)
+      - --action=$(params.action)
+      - --merge-strategy=$(params.merge-strategy)
+      - --manifest=$(params.manifest)
+      - --success-condition=$(params.success-condition)
+      - --failure-condition=$(params.failure-condition)
+      - --output=$(params.output)
   - name: echo
     image: busybox
     script: cat /tekton/results/output
