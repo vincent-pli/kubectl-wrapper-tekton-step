@@ -1,26 +1,20 @@
 apiVersion: tekton.dev/v1alpha1
 kind: TaskRun
 metadata:
-  name: kubectl-deploy-pod
+  name: kubectl-delete-pod
 spec:
   taskRef:
     name: kubectl-deploy-pod
   inputs:
     params:
     - name: action
-      value: create
-    - name: success-condition
-      value: status.phase == Running
-    - name: failure-condition
-      value: status.phase in (Failed, Error)
-    - name: output
-      value: "{.metadata.name},{.metadata.namespace}"
+      value: delete
     - name: manifest
       value: |
         apiVersion: v1
         kind: Pod
         metadata:
-          generateName: myapp-pod-
+          name: myapp-pod
           labels:
             app: myapp
         spec:
