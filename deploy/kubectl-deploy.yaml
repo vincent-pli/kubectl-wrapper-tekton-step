@@ -35,8 +35,8 @@ spec:
       - --success-condition=$(inputs.params.success-condition)
       - --failure-condition=$(inputs.params.failure-condition)
       - --output=$(inputs.params.output)
-  - name: sleep
-    image: docker
-    script: sleep 600
+  - name: echo
+    image: busybox
+    script: cat /tekton/results/output
 
 
