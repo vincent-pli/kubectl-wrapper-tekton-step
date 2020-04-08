@@ -29,6 +29,9 @@ const (
 	ManifestPath = "/tmp/manifest.yaml"
 	Separator    = ","
 	OutputFile   = "/tekton/results/output"
+	PodUID       = "POD_UID"
+	PodName      = "POD_NAME"
+	PodNamespace = "POD_NAMESPACE"
 )
 
 func init() {
@@ -59,50 +62,9 @@ func main() {
 	}
 
 	if action == "create" && setOwnerReference {
-		podUID, defined := os.LookupEnv("POD_UID")
-		if !defined {
-			log.Errorf("No environment variable found: %s:", "POD_UID")
-			os.Exit(1)
-		}
-		podName, defined := os.LookupEnv("POD_NAME")
-		if !defined {
-			log.Errorf("No environment variable found: %s:", "POD_NAME")
-			os.Exit(1)
-		}
-		podNamespace, defined := os.LookupEnv("POD_NAMESPACE")
-		if !defined {
-			log.Errorf("No environment variable found: %s:", "POD_NAMESPACE")
-			os.Exit(1)
-		}
-
-		resources, err := readFile(ManifestPath)
-		if err != nil {
-			log.Errorf("Parse manifest failed: %+v:", err)
-			os.Exit(1)
-		}
-
-		ownerPod := &corev1.Pod{}
-		ownerPod.Name = podName
-		ownerPod.Namespace = podNamespace
-		ownerPod.UID = types.UID(podUID)
-		gvk := schema.GroupVersionKind{Kind: "Pod", Group: "", Version: "v1"}
-
-		manifestByte := []byte{}
-		for _, spec := range resources {
-			spec.SetOwnerReferences([]v1.OwnerReference{*v1.NewControllerRef(ownerPod, gvk)})
-			resourceByte, err := spec.MarshalJSON()
-			if err != nil {
-				log.Errorf("Marshal menifest failed: %+v:", err)
-				os.Exit(1)
-			}
-			manifestByte = append(manifestByte, resourceByte...)
-		}
-
-		err = ioutil.WriteFile(ManifestPath, []byte(manifestByte), 0644)
-		if err != nil {
-			log.Errorf("Write manifest to file failed: after set owner: %+v", err)
-			os.Exit(1)
-		}
+		err = injectOwner()
+		log.Errorf("Inject owner failed: %+v:", err)
+		os.Exit(1)
 	}
 
 	cmd := exec.Command("/bin/sh", "/builder/kubectl.bash")
@@ -131,7 +93,6 @@ func main() {
 			os.Exit(1)
 		}
 	}
-
 }
 
 func execResource(action, mergeStrategy string) (string, string, error) {
@@ -436,6 +397,7 @@ func saveResult(resourceNamespace, resourceName, output string) error {
 	return nil
 }
 
+// Write file to the disk
 func writeFiles(outputs []outputItem) error {
 	outputBytes, err := json.Marshal(outputs)
 	if err != nil {
@@ -447,6 +409,53 @@ func writeFiles(outputs []outputItem) error {
 		log.Errorf("Write output to file failed: %+v:", err)
 		return err
 	}
+	return nil
+}
+
+// Inject owner to resource created
+func injectOwner() error {
+	podUID, defined := os.LookupEnv(PodUID)
+	if !defined {
+		return fmt.Errorf("No environment variable found: %s", PodUID)
+	}
+	podName, defined := os.LookupEnv(PodName)
+	if !defined {
+		return fmt.Errorf("No environment variable found: %s", PodName)
+	}
+	podNamespace, defined := os.LookupEnv(PodNamespace)
+	if !defined {
+		return fmt.Errorf("No environment variable found: %s", podNamespace)
+	}
+
+	resources, err := readFile(ManifestPath)
+	if err != nil {
+		log.Errorf("Parse manifest failed: %+v:", err)
+		return err
+	}
+
+	ownerPod := &corev1.Pod{}
+	ownerPod.Name = podName
+	ownerPod.Namespace = podNamespace
+	ownerPod.UID = types.UID(podUID)
+	gvk := schema.GroupVersionKind{Kind: "Pod", Group: "", Version: "v1"}
+
+	manifestByte := []byte{}
+	for _, spec := range resources {
+		spec.SetOwnerReferences([]v1.OwnerReference{*v1.NewControllerRef(ownerPod, gvk)})
+		resourceByte, err := spec.MarshalJSON()
+		if err != nil {
+			log.Errorf("Marshal menifest failed: %+v:", err)
+			return err
+		}
+		manifestByte = append(manifestByte, resourceByte...)
+	}
+
+	err = ioutil.WriteFile(ManifestPath, []byte(manifestByte), 0644)
+	if err != nil {
+		log.Errorf("Write manifest to file failed: after set owner: %+v", err)
+		return err
+	}
+
 	return nil
 }
 
