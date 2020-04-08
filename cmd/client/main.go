@@ -19,6 +19,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -84,10 +85,11 @@ func main() {
 		ownerPod.Name = podName
 		ownerPod.Namespace = podNamespace
 		ownerPod.UID = types.UID(podUID)
+		gvk := schema.GroupVersionKind{Kind: "Pod", Group: "", Version: "v1"}
 
 		manifestByte := []byte{}
 		for _, spec := range resources {
-			spec.SetOwnerReferences([]v1.OwnerReference{*v1.NewControllerRef(ownerPod, ownerPod.GroupVersionKind())})
+			spec.SetOwnerReferences([]v1.OwnerReference{*v1.NewControllerRef(ownerPod, gvk)})
 			resourceByte, err := spec.MarshalJSON()
 			if err != nil {
 				log.Errorf("Marshal menifest failed: %+v:", err)

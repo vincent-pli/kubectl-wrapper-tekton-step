@@ -16,7 +16,7 @@ spec:
     - name: output
       value: "{.metadata.name},{.metadata.namespace}"
     - name: set-ownerreference
-      value: true
+      value: "true"
     - name: manifest
       value: |
         apiVersion: v1

@@ -22,7 +22,7 @@ spec:
     default: ""
     description: An express to retrieval data from resource.
   - name: set-ownerreference
-    default: false
+    default: "false"
     description: Enable set owner reference for created resource.
   - name: image
     default: index.docker.io/vincentpli/kubeclient:v0.0.21 # it is huge
@@ -37,6 +37,7 @@ spec:
       - --success-condition=$(params.success-condition)
       - --failure-condition=$(params.failure-condition)
       - --output=$(params.output)
+      - --set-ownerreference=$(params.set-ownerreference)
     env:
       - name: POD_NAME
         valueFrom:
