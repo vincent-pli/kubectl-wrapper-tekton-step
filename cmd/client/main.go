@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -14,9 +15,13 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
 const (
@@ -35,6 +40,7 @@ func main() {
 	var successCondition string
 	var failureCondition string
 	var output string
+	var setOwnerReference bool
 
 	flag.StringVar(&action, "action", "delete", "The action on the resource.")
 	flag.StringVar(&mergeStrategy, "merge-strategy", "strategic", "The merge strtegy when using action patch.")
@@ -42,13 +48,59 @@ func main() {
 	flag.StringVar(&successCondition, "success-condition", "", "A label selector express to decide if the action on resource is success.")
 	flag.StringVar(&failureCondition, "failure-condition", "", "A label selector express to decide if the action on resource is failure.")
 	flag.StringVar(&output, "output", "", "An express to retrieval data from resource.")
-
+	flag.BoolVar(&setOwnerReference, "set-ownerreference", false, "Enable set owner reference for created resource")
 	flag.Parse()
 
 	err := ioutil.WriteFile(ManifestPath, []byte(manifest), 0644)
 	if err != nil {
 		log.Errorf("Write manifest to file failed: %+v:", err)
 		os.Exit(1)
+	}
+
+	if action == "create" && setOwnerReference {
+		podUID, defined := os.LookupEnv("POD_UID")
+		if !defined {
+			log.Errorf("No environment variable found: %s:", "POD_UID")
+			os.Exit(1)
+		}
+		podName, defined := os.LookupEnv("POD_NAME")
+		if !defined {
+			log.Errorf("No environment variable found: %s:", "POD_NAME")
+			os.Exit(1)
+		}
+		podNamespace, defined := os.LookupEnv("POD_NAMESPACE")
+		if !defined {
+			log.Errorf("No environment variable found: %s:", "POD_NAMESPACE")
+			os.Exit(1)
+		}
+
+		resources, err := readFile(ManifestPath)
+		if err != nil {
+			log.Errorf("Parse manifest failed: %+v:", err)
+			os.Exit(1)
+		}
+
+		ownerPod := &corev1.Pod{}
+		ownerPod.Name = podName
+		ownerPod.Namespace = podNamespace
+		ownerPod.UID = types.UID(podUID)
+
+		manifestByte := []byte{}
+		for _, spec := range resources {
+			spec.SetOwnerReferences([]v1.OwnerReference{*v1.NewControllerRef(ownerPod, ownerPod.GroupVersionKind())})
+			resourceByte, err := spec.MarshalJSON()
+			if err != nil {
+				log.Errorf("Marshal menifest failed: %+v:", err)
+				os.Exit(1)
+			}
+			manifestByte = append(manifestByte, resourceByte...)
+		}
+
+		err = ioutil.WriteFile(ManifestPath, []byte(manifestByte), 0644)
+		if err != nil {
+			log.Errorf("Write manifest to file failed: after set owner: %+v", err)
+			os.Exit(1)
+		}
 	}
 
 	cmd := exec.Command("/bin/sh", "/builder/kubectl.bash")
@@ -335,7 +387,7 @@ func (g gjsonLabels) Get(label string) string {
 }
 
 type outputItem struct {
-	Name string
+	Name  string
 	Value string
 }
 
@@ -383,16 +435,48 @@ func saveResult(resourceNamespace, resourceName, output string) error {
 }
 
 func writeFiles(outputs []outputItem) error {
-	log.Infof("xxxxxxxx: %+v", outputs)
 	outputBytes, err := json.Marshal(outputs)
 	if err != nil {
 		return err
 	}
-	log.Infof("xxxxxxxx: %s", string(outputBytes))
+
 	err = ioutil.WriteFile(OutputFile, outputBytes, 0644)
 	if err != nil {
 		log.Errorf("Write output to file failed: %+v:", err)
 		return err
 	}
 	return nil
+}
+
+// readFile parses a single file.
+func readFile(pathname string) ([]unstructured.Unstructured, error) {
+	file, err := os.Open(pathname)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	return decode(file)
+}
+
+// decode consumes the given reader and parses its contents as YAML.
+func decode(reader io.Reader) ([]unstructured.Unstructured, error) {
+	decoder := yaml.NewYAMLToJSONDecoder(reader)
+	objs := []unstructured.Unstructured{}
+	var err error
+	for {
+		out := unstructured.Unstructured{}
+		err = decoder.Decode(&out)
+		if err != nil {
+			break
+		}
+		if len(out.Object) == 0 {
+			continue
+		}
+		objs = append(objs, out)
+	}
+	if err != io.EOF {
+		return nil, err
+	}
+	return objs, nil
 }

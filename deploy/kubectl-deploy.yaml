@@ -21,6 +21,9 @@ spec:
   - name: output
     default: ""
     description: An express to retrieval data from resource.
+  - name: set-ownerreference
+    default: false
+    description: Enable set owner reference for created resource.
   - name: image
     default: index.docker.io/vincentpli/kubeclient:v0.0.21 # it is huge
     description: Kubectl wrapper image
@@ -34,6 +37,19 @@ spec:
       - --success-condition=$(params.success-condition)
       - --failure-condition=$(params.failure-condition)
       - --output=$(params.output)
+    env:
+      - name: POD_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.name
+      - name: POD_NAMESPACE
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+      - name: POD_UID
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.uid
   - name: echo
     image: busybox
     script: cat /tekton/results/output
