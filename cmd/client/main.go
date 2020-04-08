@@ -63,8 +63,10 @@ func main() {
 
 	if action == "create" && setOwnerReference {
 		err = injectOwner()
-		log.Errorf("Inject owner failed: %+v:", err)
-		os.Exit(1)
+	        if err != nil {
+			log.Errorf("Inject owner failed: %+v:", err)
+			os.Exit(1)
+		}
 	}
 
 	cmd := exec.Command("/bin/sh", "/builder/kubectl.bash")
