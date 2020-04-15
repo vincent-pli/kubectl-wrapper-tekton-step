@@ -28,7 +28,7 @@ import (
 const (
 	ManifestPath = "/tmp/manifest.yaml"
 	Separator    = ","
-	OutputFile   = "/tekton/results/output"
+	BaseDir      = "/tekton/results/"
 	PodUID       = "POD_UID"
 	PodName      = "POD_NAME"
 	PodNamespace = "POD_NAMESPACE"
@@ -63,7 +63,7 @@ func main() {
 
 	if action == "create" && setOwnerReference {
 		err = injectOwner()
-	        if err != nil {
+		if err != nil {
 			log.Errorf("Inject owner failed: %+v:", err)
 			os.Exit(1)
 		}
@@ -356,23 +356,38 @@ type outputItem struct {
 	Value string
 }
 
+type outputParams struct {
+	Name      string `json:"name"`
+	ValueFrom string `json:"valueFrom"`
+}
+
 // Save result to files
 func saveResult(resourceNamespace, resourceName, output string) error {
+	outputParams := []outputParams{}
 	outputs := []outputItem{}
 
-	if len(output) == 0 {
+	reader := strings.NewReader(output)
+	decoder := yaml.NewYAMLToJSONDecoder(reader)
+	err := decoder.Decode(&outputParams)
+	if err != nil {
+		log.Infof("unmarshal output params failed: %+v", err)
+		return err
+	}
+
+	if len(outputParams) == 0 {
 		log.Infof("No output parameters")
 		return nil
 	}
 
 	log.Infof("Saving resource output parameters")
-	for _, param := range strings.Split(output, Separator) {
-		param = strings.Trim(param, " ")
-		if len(param) == 0 {
+	for _, param := range outputParams {
+		param.ValueFrom = strings.Trim(param.ValueFrom, " ")
+		if len(param.ValueFrom) == 0 || len(param.Name) == 0 {
 			continue
 		}
+
 		var cmd *exec.Cmd
-		args := []string{"get", resourceName, "-o", fmt.Sprintf("jsonpath=%s", param)}
+		args := []string{"get", resourceName, "-o", fmt.Sprintf("jsonpath=%s", param.ValueFrom)}
 		if resourceNamespace != "" {
 			args = append(args, "-n", resourceNamespace)
 		}
@@ -385,13 +400,13 @@ func saveResult(resourceNamespace, resourceName, output string) error {
 			return err
 		}
 		ot := outputItem{}
-		ot.Name = param
+		ot.Name = param.Name
 		ot.Value = string(out)
 		outputs = append(outputs, ot)
 		log.Infof("Saved output parameter: %s, value: %s", ot.Name, ot.Value)
 	}
 
-	err := writeFiles(outputs)
+	err = writeFiles(outputs)
 	if err != nil {
 		return err
 	}
@@ -401,16 +416,20 @@ func saveResult(resourceNamespace, resourceName, output string) error {
 
 // Write file to the disk
 func writeFiles(outputs []outputItem) error {
-	outputBytes, err := json.Marshal(outputs)
-	if err != nil {
-		return err
+	for _, item := range outputs {
+		outputBytes, err := json.Marshal(item.Value)
+		if err != nil {
+			return err
+		}
+
+		outputFile := BaseDir + item.Name
+		err = ioutil.WriteFile(outputFile, outputBytes, 0644)
+		if err != nil {
+			log.Errorf("Write output to file failed: %+v:", err)
+			return err
+		}
 	}
 
-	err = ioutil.WriteFile(OutputFile, outputBytes, 0644)
-	if err != nil {
-		log.Errorf("Write output to file failed: %+v:", err)
-		return err
-	}
 	return nil
 }
 

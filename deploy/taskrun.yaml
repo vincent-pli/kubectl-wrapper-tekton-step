@@ -13,7 +13,11 @@ spec:
   - name: failure-condition
     value: status.phase in (Failed, Error)
   - name: output
-    value: "{.metadata.name},{.metadata.namespace}"
+    value: |
+      - name: job-name
+        valueFrom: '{.metadata.name}'
+      - name: job-namespace
+        valueFrom: '{.metadata.namespace}' 
   - name: set-ownerreference
     value: "true"
   - name: manifest

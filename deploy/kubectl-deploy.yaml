@@ -53,6 +53,6 @@ spec:
             fieldPath: metadata.uid
   - name: echo
     image: busybox
-    script: cat /tekton/results/output
+    script: cat /tekton/results/job-name
 
 
