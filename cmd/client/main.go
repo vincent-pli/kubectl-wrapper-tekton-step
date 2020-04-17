@@ -417,7 +417,8 @@ func saveResult(resourceNamespace, resourceName, output string) error {
 // Write file to the disk
 func writeFiles(outputs []outputItem) error {
 	for _, item := range outputs {
-		outputBytes, err := json.Marshal(item.Value)
+		rawIn := json.RawMessage(item.Value)
+		outputBytes, err := rawIn.MarshalJSON()
 		if err != nil {
 			return err
 		}
