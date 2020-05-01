@@ -25,7 +25,7 @@ spec:
       apiVersion: v1
       kind: Pod
       metadata:
-        generateName: myapp-pod-
+        Name: myapp-pod
         labels:
           app: myapp
       spec:

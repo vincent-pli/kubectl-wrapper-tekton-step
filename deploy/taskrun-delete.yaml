@@ -13,11 +13,6 @@ spec:
       apiVersion: v1
       kind: Pod
       metadata:
-        name: myapp-pod
+        name: myapp-podx
         labels:
           app: myapp
-      spec:
-        containers:
-        - name: myapp-container
-          image: docker
-          command: ['sh', '-c', 'echo Hello Kubernetes! && sleep 30']
