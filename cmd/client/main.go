@@ -45,6 +45,8 @@ func main() {
 	var failureCondition string
 	var output string
 	var setOwnerReference bool
+	var monitorInterval int
+	var monitorCount int
 
 	flag.StringVar(&action, "action", "delete", "The action on the resource.")
 	flag.StringVar(&mergeStrategy, "merge-strategy", "strategic", "The merge strtegy when using action patch.")
@@ -53,6 +55,8 @@ func main() {
 	flag.StringVar(&failureCondition, "failure-condition", "", "A label selector express to decide if the action on resource is failure.")
 	flag.StringVar(&output, "output", "", "An express to retrieval data from resource.")
 	flag.BoolVar(&setOwnerReference, "set-ownerreference", false, "Enable set owner reference for created resource")
+	flag.IntVar(&monitorInterval, "monitor-interval", 5, "Monitor interval when decide resource status by 'success-condition' and 'failure-condition'")
+	flag.IntVar(&monitorCount, "monitor-count", 0, "Monitor count(default: return immediately when meet) when decide resource status by 'success-condition' and 'failure-condition'")
 	flag.Parse()
 
 	err := ioutil.WriteFile(ManifestPath, []byte(manifest), 0644)
@@ -83,7 +87,7 @@ func main() {
 	}
 
 	if !isDelete {
-		err = waitResource(resourceNamespace, resourceName, successCondition, failureCondition)
+		err = waitResource(resourceNamespace, resourceName, successCondition, failureCondition, monitorInterval, monitorCount)
 		if err != nil {
 			log.Errorf("Waiting resource failed: %+v:", err)
 			os.Exit(1)
@@ -150,7 +154,9 @@ func execResource(action, mergeStrategy string) (string, string, error) {
 	return obj.GetNamespace(), resourceName, nil
 }
 
-func waitResource(namespace, name, successCondition, failureCondition string) error {
+func waitResource(namespace, name, successCondition, failureCondition string, monitorInterval, monitorCount int) error {
+	duration := time.Duration(monitorInterval)
+
 	if successCondition == "" && failureCondition == "" {
 		return nil
 	}
@@ -176,13 +182,18 @@ func waitResource(namespace, name, successCondition, failureCondition string) er
 
 	// Start the condition result reader using PollImmediateInfinite
 	// Poll intervall of 5 seconds serves as a backoff intervall in case of immediate result reader failure
-	err := wait.PollImmediateInfinite(time.Second*5,
+	err := wait.PollImmediateInfinite(time.Second*duration,
 		func() (bool, error) {
 			isErrRetry, err := checkResourceState(namespace, name, successReqs, failReqs)
 
 			if err == nil {
 				log.Infof("Returning from successful wait for resource %s", name)
-				return true, nil
+				monitorCount--
+				if monitorCount == 0 {
+					return true, nil
+				}
+
+				return false, nil
 			}
 
 			if isErrRetry {
