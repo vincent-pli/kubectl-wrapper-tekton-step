@@ -29,6 +29,7 @@ spec:
         labels:
           app: myapp
       spec:
+        restartPolicy: Never
         containers:
         - name: myapp-container
           image: docker

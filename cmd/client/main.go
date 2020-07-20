@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,8 +46,8 @@ func main() {
 	var failureCondition string
 	var output string
 	var setOwnerReference bool
-	var monitorInterval int
-	var monitorCount int
+	var monitorInterval string
+	var monitorCount string
 
 	flag.StringVar(&action, "action", "delete", "The action on the resource.")
 	flag.StringVar(&mergeStrategy, "merge-strategy", "strategic", "The merge strtegy when using action patch.")
@@ -55,8 +56,8 @@ func main() {
 	flag.StringVar(&failureCondition, "failure-condition", "", "A label selector express to decide if the action on resource is failure.")
 	flag.StringVar(&output, "output", "", "An express to retrieval data from resource.")
 	flag.BoolVar(&setOwnerReference, "set-ownerreference", false, "Enable set owner reference for created resource")
-	flag.IntVar(&monitorInterval, "monitor-interval", 5, "Monitor interval when decide resource status by 'success-condition' and 'failure-condition'")
-	flag.IntVar(&monitorCount, "monitor-count", 0, "Monitor count(default: return immediately when meet) when decide resource status by 'success-condition' and 'failure-condition'")
+	flag.StringVar(&monitorInterval, "monitor-interval", "5", "Monitor interval(second) when decide resource status by 'success-condition' and 'failure-condition'")
+	flag.StringVar(&monitorCount, "monitor-count", "1", "Monitor count(default: return immediately when meet) when decide resource status by 'success-condition' and 'failure-condition'")
 	flag.Parse()
 
 	err := ioutil.WriteFile(ManifestPath, []byte(manifest), 0644)
@@ -73,6 +74,18 @@ func main() {
 		}
 	}
 
+	monitorIntervalI, err := strconv.Atoi(monitorInterval)
+	if err != nil {
+		log.Errorf("Parse parameter failed: %+v:", err)
+		os.Exit(1)
+	}
+
+	monitorCountI, err := strconv.Atoi(monitorCount)
+	if err != nil {
+		log.Errorf("Parse parameter failed: %+v:", err)
+		os.Exit(1)
+	}
+
 	// cmd := exec.Command("/bin/sh", "/builder/kubectl.bash")
 	// _, err = cmd.Output()
 	// if err != nil {
@@ -87,7 +100,7 @@ func main() {
 	}
 
 	if !isDelete {
-		err = waitResource(resourceNamespace, resourceName, successCondition, failureCondition, monitorInterval, monitorCount)
+		err = waitResource(resourceNamespace, resourceName, successCondition, failureCondition, monitorIntervalI, monitorCountI)
 		if err != nil {
 			log.Errorf("Waiting resource failed: %+v:", err)
 			os.Exit(1)
@@ -188,6 +201,7 @@ func waitResource(namespace, name, successCondition, failureCondition string, mo
 
 			if err == nil {
 				log.Infof("Returning from successful wait for resource %s", name)
+				log.Infof("Monitoring count: %d", monitorCount)
 				monitorCount--
 				if monitorCount == 0 {
 					return true, nil
